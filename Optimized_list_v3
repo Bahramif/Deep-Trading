@@ -1,0 +1,79 @@
+from google.colab import files
+uploaded = files.upload()
+
+from google.colab import files
+uploaded = files.upload()
+
+shopping_list=['steak','sirloin','ham','blackberry','cherry','grapefruit','mango','kiwi']
+Meat=['meat','fish','salmon','trout','tilapia','ground beef','steak','sirloin','ham','trout','tenderloin','tuna']
+Grains_bread=['pasta','rice','bread']
+oil=['butter','oil']
+Diary=['egg','cheese','yogurt','milk']
+Produce=['onion','garlic']
+fruits=['apple', 'apricot','banana','blackberry','cherry','grapefruit','mango','kiwi','orange','papaya','passion fruit'
+,'peach','pear','pea','pineapple','plum','watermelon','raspberry','blueberry','grape']
+Vegetables=['asparagus','cabbage','avocado','bean','broccoli','corn','cucumber','carrot','eggplant','lemon','lettuce','mushroom','potatoe',
+            'tomato','green pepper','asparagus','brussels sprout','parsley','oregano','thyme','rosemary','basil','lavender']
+All=fruits+Vegetables+Produce+Diary+oil+Grains_bread+Meat
+
+
+from math import radians, cos, sin, asin, sqrt
+!pip install googlemaps
+import googlemaps
+from datetime import datetime
+gmaps = googlemaps.Client(key='AIzaSyCHGT3vfIs5DsrmPJAEyvdWnEL25ItJr3E')
+def distance(lon1, lat1, lon2, lat2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    """
+    # convert decimal degrees to radians 
+    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+    # haversine formula 
+    dlon = lon2 - lon1 
+    dlat = lat2 - lat1 
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a)) 
+    # Radius of earth in kilometers is 6371
+    km = 6371* c
+    return km
+  
+def Optimized_list(list,store_dataset,product_dataset,cust_zip):
+  import pandas as pd
+  df_stores=pd.read_csv(store_dataset)
+  del df_stores['Unnamed: 0']
+  df_stores=df_stores.drop_duplicates()
+  df_items=pd.read_csv(product_dataset)
+  df_items=df_items[df_items['product'].isin(list)]
+  df_agg = df_items.groupby(['merchant_name','product']).agg({'current_price':min})
+  df_agg2=df_agg.groupby(['merchant_name']).agg({'current_price':sum})
+  df_agg2['count']=df_agg.groupby(['merchant_name']).count()
+  df_agg2['Overal_percentage']=df_agg.groupby(['merchant_name']).count()*100/len(All)
+  df_agg3=df_agg2.sort_values('count',ascending=False)
+  geocode_result = gmaps.geocode(cust_zip)
+  dic=geocode_result[0]
+  buyer_loc=dic['geometry']['location']
+  buyer_loc_lat=buyer_loc['lat']
+  buyer_loc_lng=buyer_loc['lng']
+  Stores=df_stores.merchant_name.unique()
+  for items in df_stores.index:
+    store_lon=df_stores.loc[items,'merchant_lon']
+    store_lat=df_stores.loc[items,'merchant_lat']
+    df_stores.loc[items,'store_distance']=distance(buyer_loc_lng,buyer_loc_lat,store_lon,store_lat)
+  df_stores_distance=df_stores.groupby('merchant_name').agg({'store_distance':min}).sort_values('store_distance',ascending=True)
+  df_overal=df_agg3.join(df_stores_distance,on='merchant_name')
+  df_agg_level=df_agg.unstack()
+  df_agg_level.columns=df_agg_level.columns.levels[1]
+  df_overal2=df_overal.join(df_agg_level,on='merchant_name',how='inner')
+  df_overal2=df_overal2.sort_values(by=['Overal_percentage','store_distance'], ascending=[False, True])
+#   .sort_values(['Overal_percentage','store_distance'],)
+  from google.colab import files
+  from google.colab import drive
+  # drive.mount('drive')
+  df_overal2.to_csv('optimized_list.csv') 
+  files.download('optimized_list.csv')
+  return df_overal2
+  
+  Optimized_list(list=shopping_list,store_dataset='gmap_stores4.csv',product_dataset='flipp_product.csv',cust_zip='l6a3r7')
+  
+  
